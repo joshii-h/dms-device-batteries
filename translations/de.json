@@ -1,7 +1,4 @@
 {
-    "Device": {
-        "Device": "Gerät"
-    },
     "Device Batteries": {
         "Device Batteries": "Geräteakkus"
     },
@@ -17,14 +14,8 @@
     "Low battery warning": {
         "Low battery warning": "Warnung bei schwachem Akku"
     },
-    "Warn once per device below this level; the bar turns orange, red at 10 %": {
-        "Warn once per device below this level; the bar turns orange, red at 10 %": "Einmal je Gerät unter diesem Stand warnen; die Anzeige wird orange, unter 10 % rot"
-    },
     "Desktop notification": {
         "Desktop notification": "Desktop-Benachrichtigung"
-    },
-    "Send a notification (notify-send) when a device runs low": {
-        "Send a notification (notify-send) when a device runs low": "Benachrichtigung (notify-send) schicken, wenn ein Akku schwach wird"
     },
     "Refresh interval": {
         "Refresh interval": "Abfrage-Intervall"
@@ -40,5 +31,11 @@
     },
     "5 minutes": {
         "5 minutes": "5 Minuten"
+    },
+    "Warn once per device at or below this level; the bar turns orange, red at 10 % or less": {
+        "Warn once per device at or below this level; the bar turns orange, red at 10 % or less": "Einmal je Gerät warnen, wenn der Akku auf diesen Stand oder darunter fällt; die Anzeige wird orange, bei 10 % oder weniger rot"
+    },
+    "Send a desktop notification when a device runs low": {
+        "Send a desktop notification when a device runs low": "Desktop-Benachrichtigung schicken, wenn ein Akku schwach wird"
     }
 }

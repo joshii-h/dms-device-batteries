@@ -8,7 +8,8 @@ read directly from UPower by the plugin; this helper adds:
   - USB headsets via HeadsetControl (e.g. Logitech/Astro, SteelSeries, HyperX)
 
 Both sources are optional; missing tools are skipped silently.
-Output: [{"name", "icon", "percent", "charging", "source"}]
+Output: [{"key", "name", "icon", "percent", "charging", "source"}]
+Unknown levels (-1) and sleeping Razer mice (0 % and not charging) are left out.
 
   device-batteries.py               # print once
   device-batteries.py --watch 60    # keep running: one JSON line per change,
@@ -16,6 +17,7 @@ Output: [{"name", "icon", "percent", "charging", "source"}]
                                     # plugged in, mouse docked) and every 60 s
 """
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -35,13 +37,17 @@ def collect():
         try:
             if not d.capabilities.get("battery"):
                 continue
+            level, charging = d.battery_level, bool(d.is_charging)
+            # -1 = unknown; a sleeping wireless mouse reports 0 % (not charging)
+            if level < 0 or (level == 0 and not charging):
+                continue
             typ = str(d.type).lower()
             out.append({
                 "name": d.name.replace(" (Receiver)", "").replace(" (Wireless)", ""),
                 "icon": "mouse" if "mouse" in typ else ("keyboard" if "keyboard" in typ else
                                                         "headphones" if "headset" in typ else "devices"),
-                "percent": round(d.battery_level),
-                "charging": bool(d.is_charging),
+                "percent": round(level),
+                "charging": charging,
                 "source": "openrazer",
             })
         except Exception:
@@ -58,16 +64,23 @@ def collect():
         for d in data.get("devices", []):
             b = d.get("battery") or {}
             status = b.get("status", "")
-            if status not in ("BATTERY_AVAILABLE", "BATTERY_CHARGING"):
+            level = int(b.get("level", -1))
+            if status not in ("BATTERY_AVAILABLE", "BATTERY_CHARGING") or level < 0:
                 continue
             out.append({
                 "name": d.get("device") or d.get("product") or "Headset",
                 "icon": "headphones",
-                "percent": int(b.get("level", 0)),
+                "percent": level,
                 "charging": status == "BATTERY_CHARGING",
                 "source": "headsetcontrol",
             })
 
+    # stable, unique keys (two identical headsets must not share a warning)
+    seen = {}
+    for d in out:
+        base = d["source"] + ":" + d["name"]
+        seen[base] = seen.get(base, 0) + 1
+        d["key"] = base if seen[base] == 1 else f"{base}#{seen[base]}"
     return out
 
 
@@ -82,17 +95,24 @@ def watch(interval):
     except Exception:
         mon = None   # no pyudev: plain polling
     last = None
+    parent = os.getppid()
     while True:
+        # the shell went away (restart/crash): stop instead of lingering on
+        if os.getppid() != parent:
+            return
         cur = json.dumps(collect(), ensure_ascii=False)
         if cur != last:
             print(cur, flush=True)
             last = cur
         deadline = time.time() + interval
-        while time.time() < deadline:
+        while (left := deadline - time.time()) > 0:
+            if os.getppid() != parent:
+                return
+            left = min(left, 10)
             if mon is None:
-                time.sleep(deadline - time.time())
-                break
-            if mon.poll(timeout=deadline - time.time()) is not None:
+                time.sleep(left)
+                continue
+            if mon.poll(timeout=left) is not None:
                 # let the device settle, then swallow the rest of the burst
                 time.sleep(1.5)
                 while mon.poll(timeout=0) is not None:
@@ -102,7 +122,10 @@ def watch(interval):
 
 if "--watch" in sys.argv:
     i = sys.argv.index("--watch")
-    secs = int(sys.argv[i + 1]) if len(sys.argv) > i + 1 else 60
+    try:
+        secs = int(sys.argv[i + 1])
+    except (IndexError, ValueError):
+        secs = 60
     try:
         watch(max(5, secs))
     except (KeyboardInterrupt, BrokenPipeError):

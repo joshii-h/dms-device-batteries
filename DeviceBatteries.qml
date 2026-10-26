@@ -1,76 +1,29 @@
 import QtQuick
-import Quickshell
-import Quickshell.Io
-import Quickshell.Services.UPower
 import qs.Common
 import qs.DCommon.Widgets
 import qs.Services
 import qs.Modules.Plugins
 
-// Device Batteries: UPower (phones, Bluetooth) + device-batteries.py (Razer, USB headsets)
+// Bar widget (one per monitor): display only. The daemon collects the
+// devices, sends the warnings and shares the sorted list as global "devices".
 PluginComponent {
     id: root
 
-    readonly property int warnLevel: parseInt(pluginData.warnLevel || "20")
-    readonly property bool notify: pluginData.notify !== undefined ? pluginData.notify : true
-    readonly property int pollSeconds: parseInt(pluginData.pollSeconds || "60")
-    readonly property string helper: pluginService.pluginDirectory + "/deviceBatteries/device-batteries.py"
-    // one helper for all bar instances (one per monitor): the first instance
-    // owns it and shares the result via plugin global variables; another
-    // instance takes over if the owner goes away (monitor unplugged)
-    readonly property string instanceId: Math.random().toString(36).slice(2)
-    property string owner: ""
-    property var extraDevices: []
-    property var warned: ({})
-    readonly property bool isOwner: owner === instanceId
+    readonly property int warnLevel: parseInt(pluginData.warnLevel) || 20
+    property var devices: PluginService.getGlobalVar("deviceBatteries", "devices", [])
+    readonly property var lowest: devices.length > 0 ? devices[0] : null
 
-    function syncGlobals() {
-        owner = PluginService.getGlobalVar("deviceBatteries", "helperOwner", "");
-        extraDevices = PluginService.getGlobalVar("deviceBatteries", "extraDevices", []);
-        if (!owner) {
-            PluginService.setGlobalVar("deviceBatteries", "helperOwner", instanceId);
-            owner = instanceId;
-        }
-    }
-    Component.onCompleted: syncGlobals()
-    Component.onDestruction: if (isOwner) PluginService.setGlobalVar("deviceBatteries", "helperOwner", "")
     Connections {
         target: PluginService
         function onGlobalVarChanged(pluginId, varName) {
-            if (pluginId === "deviceBatteries")
-                root.syncGlobals();
+            if (pluginId === "deviceBatteries" && varName === "devices")
+                root.devices = PluginService.getGlobalVar("deviceBatteries", "devices", []);
         }
     }
 
-    // external devices from UPower only – the laptop battery has its own DMS widget
-    readonly property var upowerDevices: UPower.devices.values
-        .filter(d => d.ready && !d.isLaptopBattery && d.percentage > 0
-                && d.type !== UPowerDeviceType.LinePower && d.type !== UPowerDeviceType.Ups)
-        .map(d => ({
-            name: d.model || I18n.trFor("deviceBatteries", "Device"),
-            icon: iconFor(d.type),
-            percent: Math.round(d.percentage * 100),
-            charging: d.state === UPowerDeviceState.Charging,
-            source: "upower"
-        }))
-
-    readonly property var devices: upowerDevices.concat(extraDevices)
-        .sort((a, b) => a.percent - b.percent)
-    readonly property var lowest: devices.length > 0 ? devices[0] : null
-
-    function iconFor(t) {
-        switch (t) {
-        case UPowerDeviceType.Phone: return "smartphone";
-        case UPowerDeviceType.Mouse: return "mouse";
-        case UPowerDeviceType.Keyboard: return "keyboard";
-        case UPowerDeviceType.Headset:
-        case UPowerDeviceType.Headphones: return "headphones";
-        case UPowerDeviceType.GamingInput: return "sports_esports";
-        case UPowerDeviceType.Tablet: return "tablet";
-        case UPowerDeviceType.Wearable: return "watch";
-        default: return "bluetooth";
-        }
-    }
+    // no device: hide the pill completely (an invisible Row keeps its width)
+    onLowestChanged: setVisibilityOverride(lowest !== null)
+    Component.onCompleted: setVisibilityOverride(lowest !== null)
 
     function levelColor(dev) {
         if (!dev) return Theme.surfaceText;
@@ -87,55 +40,9 @@ PluginComponent {
         return steps[Math.min(7, Math.floor(dev.percent / 12.5))];
     }
 
-    // one warning per device, re-armed once it has been charged (owner only,
-    // otherwise every monitor's bar would send its own notification)
-    onDevicesChanged: {
-        if (!isOwner)
-            return;
-        const w = Object.assign({}, warned);
-        for (const d of devices) {
-            if (d.charging || d.percent > warnLevel + 5) {
-                delete w[d.name];
-            } else if (d.percent <= warnLevel && !w[d.name]) {
-                w[d.name] = true;
-                if (notify)
-                    Quickshell.execDetached(["notify-send", "-a", I18n.trFor("deviceBatteries", "Device Batteries"),
-                        "-i", "battery-caution",
-                        I18n.trFor("deviceBatteries", "%1: battery low").arg(d.name),
-                        I18n.trFor("deviceBatteries", "%1 % left – please charge.").arg(d.percent)]);
-            }
-        }
-        warned = w;
-    }
-
-    // helper keeps running: one JSON line per change, re-read at once on udev
-    // events (device plugged in, mouse docked) and every pollSeconds otherwise
-    Process {
-        id: extraProc
-        running: root.isOwner
-        command: ["python3", root.helper, "--watch", String(root.pollSeconds)]
-        stdout: SplitParser {
-            onRead: line => {
-                try { PluginService.setGlobalVar("deviceBatteries", "extraDevices", JSON.parse(line || "[]")); }
-                catch (e) { /* ignore partial lines */ }
-            }
-        }
-        onExited: if (root.isOwner) restartTimer.start()
-    }
-
-    Timer {
-        id: restartTimer
-        interval: 10000
-        onTriggered: if (root.isOwner) extraProc.running = true
-    }
-
-    // new interval: restart the helper with it
-    onPollSecondsChanged: if (extraProc.running) { extraProc.running = false; }
-
     horizontalBarPill: Component {
         Row {
             spacing: Theme.spacingXS
-            visible: root.lowest !== null
 
             DIcon {
                 name: root.lowest ? root.lowest.icon : "battery_unknown"
@@ -155,7 +62,6 @@ PluginComponent {
     verticalBarPill: Component {
         Column {
             spacing: Theme.spacingXS
-            visible: root.lowest !== null
 
             DIcon {
                 name: root.lowest ? root.lowest.icon : "battery_unknown"

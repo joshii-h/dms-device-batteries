@@ -9,7 +9,7 @@ PluginSettings {
     SelectionSetting {
         settingKey: "warnLevel"
         label: I18n.trFor("deviceBatteries", "Low battery warning")
-        description: I18n.trFor("deviceBatteries", "Warn once per device below this level; the bar turns orange, red at 10 %")
+        description: I18n.trFor("deviceBatteries", "Warn once per device at or below this level; the bar turns orange, red at 10 % or less")
         options: [
             { label: "10 %", value: "10" },
             { label: "15 %", value: "15" },
@@ -22,7 +22,7 @@ PluginSettings {
     ToggleSetting {
         settingKey: "notify"
         label: I18n.trFor("deviceBatteries", "Desktop notification")
-        description: I18n.trFor("deviceBatteries", "Send a notification (notify-send) when a device runs low")
+        description: I18n.trFor("deviceBatteries", "Send a desktop notification when a device runs low")
         defaultValue: true
     }
 
