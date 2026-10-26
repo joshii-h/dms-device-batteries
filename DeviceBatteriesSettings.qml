@@ -26,13 +26,6 @@ PluginSettings {
         defaultValue: true
     }
 
-    ToggleSetting {
-        settingKey: "includeLaptop"
-        label: I18n.trFor("deviceBatteries", "Include laptop battery")
-        description: I18n.trFor("deviceBatteries", "Also list the laptop's own battery (off by default, DMS has a separate battery widget)")
-        defaultValue: false
-    }
-
     SelectionSetting {
         settingKey: "pollSeconds"
         label: I18n.trFor("deviceBatteries", "Refresh interval")
