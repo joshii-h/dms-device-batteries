@@ -169,6 +169,8 @@ PluginComponent {
                             width: parent.width - 22 - 110 - Theme.spacingM * 2
                             text: modelData.name
                             elide: Text.ElideRight
+                            wrapMode: Text.NoWrap
+                            maximumLineCount: 1
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.surfaceText
                             anchors.verticalCenter: parent.verticalCenter
