@@ -26,8 +26,11 @@ already has its own DMS widget.
 | [HeadsetControl](https://github.com/Sapd/HeadsetControl) | USB wireless headsets (Logitech/Astro, SteelSeries, HyperX, Corsair, …) | `headsetcontrol` ≥ 4.2 for the Astro A50 Gen 5 |
 
 UPower devices update live. OpenRazer and HeadsetControl are read by the
-bundled helper `device-batteries.py` at the configured interval. Every source
-is optional – whatever is not installed is skipped.
+bundled helper `device-batteries.py`, which keeps running and re-reads at once
+when a device is plugged in or docked (udev, needs `pyudev`), otherwise at the
+configured interval. With several monitors only one helper runs and all bars
+share its result. Every source is optional – whatever is not installed is
+skipped.
 
 ## Installation
 
@@ -45,7 +48,7 @@ section in Settings → DankBar Layout.
 |---|---|
 | Low battery warning | 20 % |
 | Desktop notification (`notify-send`) | on |
-| Refresh interval for OpenRazer/HeadsetControl | 1 minute |
+| Refresh interval for OpenRazer/HeadsetControl (plug-in events update at once) | 1 minute |
 
 ## Translations
 

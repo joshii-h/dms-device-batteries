@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Services.UPower
 import qs.Common
 import qs.DCommon.Widgets
+import qs.Services
 import qs.Modules.Plugins
 
 // Device Batteries: UPower (phones, Bluetooth) + device-batteries.py (Razer, USB headsets)
@@ -14,8 +15,32 @@ PluginComponent {
     readonly property bool notify: pluginData.notify !== undefined ? pluginData.notify : true
     readonly property int pollSeconds: parseInt(pluginData.pollSeconds || "60")
     readonly property string helper: pluginService.pluginDirectory + "/deviceBatteries/device-batteries.py"
+    // one helper for all bar instances (one per monitor): the first instance
+    // owns it and shares the result via plugin global variables; another
+    // instance takes over if the owner goes away (monitor unplugged)
+    readonly property string instanceId: Math.random().toString(36).slice(2)
+    property string owner: ""
     property var extraDevices: []
     property var warned: ({})
+    readonly property bool isOwner: owner === instanceId
+
+    function syncGlobals() {
+        owner = PluginService.getGlobalVar("deviceBatteries", "helperOwner", "");
+        extraDevices = PluginService.getGlobalVar("deviceBatteries", "extraDevices", []);
+        if (!owner) {
+            PluginService.setGlobalVar("deviceBatteries", "helperOwner", instanceId);
+            owner = instanceId;
+        }
+    }
+    Component.onCompleted: syncGlobals()
+    Component.onDestruction: if (isOwner) PluginService.setGlobalVar("deviceBatteries", "helperOwner", "")
+    Connections {
+        target: PluginService
+        function onGlobalVarChanged(pluginId, varName) {
+            if (pluginId === "deviceBatteries")
+                root.syncGlobals();
+        }
+    }
 
     // external devices from UPower only – the laptop battery has its own DMS widget
     readonly property var upowerDevices: UPower.devices.values
@@ -62,8 +87,11 @@ PluginComponent {
         return steps[Math.min(7, Math.floor(dev.percent / 12.5))];
     }
 
-    // one warning per device, re-armed once it has been charged
+    // one warning per device, re-armed once it has been charged (owner only,
+    // otherwise every monitor's bar would send its own notification)
     onDevicesChanged: {
+        if (!isOwner)
+            return;
         const w = Object.assign({}, warned);
         for (const d of devices) {
             if (d.charging || d.percent > warnLevel + 5) {
@@ -80,24 +108,29 @@ PluginComponent {
         warned = w;
     }
 
+    // helper keeps running: one JSON line per change, re-read at once on udev
+    // events (device plugged in, mouse docked) and every pollSeconds otherwise
     Process {
         id: extraProc
-        command: ["python3", root.helper]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try { root.extraDevices = JSON.parse(text || "[]"); }
-                catch (e) { root.extraDevices = []; }
+        running: root.isOwner
+        command: ["python3", root.helper, "--watch", String(root.pollSeconds)]
+        stdout: SplitParser {
+            onRead: line => {
+                try { PluginService.setGlobalVar("deviceBatteries", "extraDevices", JSON.parse(line || "[]")); }
+                catch (e) { /* ignore partial lines */ }
             }
         }
+        onExited: if (root.isOwner) restartTimer.start()
     }
 
     Timer {
-        interval: root.pollSeconds * 1000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: if (!extraProc.running) extraProc.running = true
+        id: restartTimer
+        interval: 10000
+        onTriggered: if (root.isOwner) extraProc.running = true
     }
+
+    // new interval: restart the helper with it
+    onPollSecondsChanged: if (extraProc.running) { extraProc.running = false; }
 
     horizontalBarPill: Component {
         Row {
