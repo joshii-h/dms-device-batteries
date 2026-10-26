@@ -106,5 +106,4 @@ PluginComponent {
     }
 
     Component.onCompleted: PluginService.setGlobalVar("deviceBatteries", "devices", devices)
-    Component.onDestruction: PluginService.setGlobalVar("deviceBatteries", "devices", [])
 }

@@ -49,6 +49,7 @@ def collect():
                 "percent": round(level),
                 "charging": charging,
                 "source": "openrazer",
+                "key": "openrazer:" + str(d.serial),   # stable per device
             })
         except Exception:
             pass  # device asleep or switched off
@@ -75,9 +76,12 @@ def collect():
                 "source": "headsetcontrol",
             })
 
-    # stable, unique keys (two identical headsets must not share a warning)
+    # unique keys for sources without a serial (two identical headsets must
+    # not share a warning); Razer devices already have their serial as key
     seen = {}
     for d in out:
+        if "key" in d:
+            continue
         base = d["source"] + ":" + d["name"]
         seen[base] = seen.get(base, 0) + 1
         d["key"] = base if seen[base] == 1 else f"{base}#{seen[base]}"
