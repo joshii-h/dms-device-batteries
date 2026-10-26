@@ -1,0 +1,16 @@
+{
+    "$schema": "https://github.com/AvengeMedia/DankMaterialShell/raw/refs/heads/master/PLUGINS/plugin-schema.json",
+    "id": "deviceBatteries",
+    "name": "Device Batteries",
+    "description": "Battery levels of your phone, Bluetooth devices, Razer mice and USB headsets in one bar widget, with a low-battery warning",
+    "version": "1.0.0",
+    "author": "joshii-h",
+    "icon": "battery_full",
+    "type": "widget",
+    "capabilities": ["dankbar-widget", "monitoring"],
+    "component": "./DeviceBatteries.qml",
+    "settings": "./DeviceBatteriesSettings.qml",
+    "requires": ["python3"],
+    "permissions": ["settings_read", "settings_write", "process"],
+    "license": "MIT"
+}

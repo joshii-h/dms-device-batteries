@@ -1,0 +1,44 @@
+{
+    "Device": {
+        "Device": "Gerät"
+    },
+    "Device Batteries": {
+        "Device Batteries": "Geräteakkus"
+    },
+    "%1: battery low": {
+        "%1: battery low": "%1: Akku schwach"
+    },
+    "%1 % left – please charge.": {
+        "%1 % left – please charge.": "Noch %1 % – bitte laden."
+    },
+    "No devices with a battery level found": {
+        "No devices with a battery level found": "Keine Geräte mit Akkustand gefunden"
+    },
+    "Low battery warning": {
+        "Low battery warning": "Warnung bei schwachem Akku"
+    },
+    "Warn once per device below this level; the bar turns orange, red at 10 %": {
+        "Warn once per device below this level; the bar turns orange, red at 10 %": "Einmal je Gerät unter diesem Stand warnen; die Anzeige wird orange, unter 10 % rot"
+    },
+    "Desktop notification": {
+        "Desktop notification": "Desktop-Benachrichtigung"
+    },
+    "Send a notification (notify-send) when a device runs low": {
+        "Send a notification (notify-send) when a device runs low": "Benachrichtigung (notify-send) schicken, wenn ein Akku schwach wird"
+    },
+    "Refresh interval": {
+        "Refresh interval": "Abfrage-Intervall"
+    },
+    "How often Razer and headset levels are read (UPower devices update live)": {
+        "How often Razer and headset levels are read (UPower devices update live)": "Wie oft Razer- und Headset-Akkus gelesen werden (UPower-Geräte aktualisieren sich sofort)"
+    },
+    "30 seconds": {
+        "30 seconds": "30 Sekunden"
+    },
+    "1 minute": {
+        "1 minute": "1 Minute"
+    },
+    "5 minutes": {
+        "5 minutes": "5 Minuten"
+    }
+}
