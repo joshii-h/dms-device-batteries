@@ -40,5 +40,14 @@
     },
     "5 minutes": {
         "5 minutes": "5 Minuten"
+    },
+    "Laptop": {
+        "Laptop": "Notebook"
+    },
+    "Include laptop battery": {
+        "Include laptop battery": "Notebook-Akku einbeziehen"
+    },
+    "Also list the laptop's own battery (off by default, DMS has a separate battery widget)": {
+        "Also list the laptop's own battery (off by default, DMS has a separate battery widget)": "Auch den Akku des Notebooks anzeigen (standardmäßig aus, DMS hat dafür ein eigenes Akku-Widget)"
     }
 }

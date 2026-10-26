@@ -13,17 +13,20 @@ PluginComponent {
     readonly property int warnLevel: parseInt(pluginData.warnLevel || "20")
     readonly property bool notify: pluginData.notify !== undefined ? pluginData.notify : true
     readonly property int pollSeconds: parseInt(pluginData.pollSeconds || "60")
+    // laptop battery is off by default – DMS has its own battery widget for it
+    readonly property bool includeLaptop: pluginData.includeLaptop === true
     readonly property string helper: pluginService.pluginDirectory + "/deviceBatteries/device-batteries.py"
     property var extraDevices: []
     property var warned: ({})
 
-    // peripherals from UPower (no laptop batteries, no AC adapters)
+    // peripherals from UPower (laptop battery optional, no AC adapters)
     readonly property var upowerDevices: UPower.devices.values
-        .filter(d => d.ready && !d.isLaptopBattery && d.percentage > 0
+        .filter(d => d.ready && (includeLaptop || !d.isLaptopBattery) && d.percentage > 0
                 && d.type !== UPowerDeviceType.LinePower && d.type !== UPowerDeviceType.Ups)
         .map(d => ({
-            name: d.model || I18n.trFor("deviceBatteries", "Device"),
-            icon: iconFor(d.type),
+            name: d.isLaptopBattery ? I18n.trFor("deviceBatteries", "Laptop")
+                                    : (d.model || I18n.trFor("deviceBatteries", "Device")),
+            icon: d.isLaptopBattery ? "laptop" : iconFor(d.type),
             percent: Math.round(d.percentage * 100),
             charging: d.state === UPowerDeviceState.Charging,
             source: "upower"

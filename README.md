@@ -2,6 +2,9 @@
 
 A [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell) plugin
 that shows the battery levels of all your wireless peripherals in one place.
+Other plugins cover a single device (one mouse model, controllers, ZMK
+keyboards, a phone); this one combines UPower, OpenRazer and HeadsetControl
+in one widget.
 
 ![popout](assets/popout.png)
 
@@ -41,6 +44,7 @@ section in Settings → DankBar Layout.
 |---|---|
 | Low battery warning | 20 % |
 | Desktop notification (`notify-send`) | on |
+| Include laptop battery (DMS has its own battery widget) | off |
 | Refresh interval for OpenRazer/HeadsetControl | 1 minute |
 
 ## Translations
