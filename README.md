@@ -3,6 +3,8 @@
 A [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell) plugin
 that shows the battery levels of all your wireless peripherals in one place.
 
+![popout](assets/popout.png)
+
 ![bar widget](assets/bar.png)
 
 - **Bar pill** shows the device with the lowest battery (icon + percent),
