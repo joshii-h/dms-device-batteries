@@ -11,13 +11,18 @@ PluginComponent {
 
     readonly property int warnLevel: parseInt(pluginData.warnLevel) || 20
     property var devices: PluginService.getGlobalVar("deviceBatteries", "devices", [])
+    property var problems: PluginService.getGlobalVar("deviceBatteries", "problems", [])
     readonly property var lowest: devices.length > 0 ? devices[0] : null
 
     Connections {
         target: PluginService
         function onGlobalVarChanged(pluginId, varName) {
-            if (pluginId === "deviceBatteries" && varName === "devices")
+            if (pluginId !== "deviceBatteries")
+                return;
+            if (varName === "devices")
                 root.devices = PluginService.getGlobalVar("deviceBatteries", "devices", []);
+            else if (varName === "problems")
+                root.problems = PluginService.getGlobalVar("deviceBatteries", "problems", []);
         }
     }
 
@@ -79,16 +84,42 @@ PluginComponent {
     }
 
     popoutWidth: 340
-    popoutHeight: 90 + Math.max(1, devices.length) * 44
+    popoutHeight: 90 + Math.max(1, devices.length) * 44 + problems.length * 64
 
     popoutContent: Component {
         PopoutComponent {
             headerText: I18n.trFor("deviceBatteries", "Device Batteries")
-            detailsText: root.devices.length === 0 ? I18n.trFor("deviceBatteries", "No devices with a battery level found") : ""
+            detailsText: root.devices.length === 0 && root.problems.length === 0
+                         ? I18n.trFor("deviceBatteries", "No devices with a battery level found") : ""
 
             Column {
                 width: parent.width
                 spacing: Theme.spacingS
+
+                // setup problems (e.g. Razer driver missing) above the devices
+                Repeater {
+                    model: root.problems
+                    delegate: Row {
+                        required property var modelData
+                        width: parent.width
+                        spacing: Theme.spacingM
+
+                        DIcon {
+                            name: "warning"
+                            size: 22
+                            color: Theme.warning
+                        }
+                        StyledText {
+                            width: parent.width - 22 - Theme.spacingM
+                            text: modelData.text
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 3
+                            elide: Text.ElideRight
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.warning
+                        }
+                    }
+                }
 
                 Repeater {
                     model: root.devices

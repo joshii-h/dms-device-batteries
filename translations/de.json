@@ -20,9 +20,6 @@
     "Refresh interval": {
         "Refresh interval": "Abfrage-Intervall"
     },
-    "How often Razer and headset levels are read (UPower devices update live)": {
-        "How often Razer and headset levels are read (UPower devices update live)": "Wie oft Razer- und Headset-Akkus gelesen werden (UPower-Geräte aktualisieren sich sofort)"
-    },
     "30 seconds": {
         "30 seconds": "30 Sekunden"
     },
@@ -37,5 +34,17 @@
     },
     "Send a desktop notification when a device runs low": {
         "Send a desktop notification when a device runs low": "Desktop-Benachrichtigung schicken, wenn ein Akku schwach wird"
+    },
+    "A Razer device is plugged in, but the OpenRazer kernel driver is not loaded – rebuild or load the openrazer driver for the running kernel.": {
+        "A Razer device is plugged in, but the OpenRazer kernel driver is not loaded – rebuild or load the openrazer driver for the running kernel.": "Ein Razer-Gerät ist angeschlossen, aber der OpenRazer-Kerneltreiber ist nicht geladen – den openrazer-Treiber für den laufenden Kernel neu bauen oder laden."
+    },
+    "The OpenRazer driver is loaded, but openrazer-daemon does not answer – start it.": {
+        "The OpenRazer driver is loaded, but openrazer-daemon does not answer – start it.": "Der OpenRazer-Treiber ist geladen, aber openrazer-daemon antwortet nicht – bitte starten."
+    },
+    "Battery level unavailable": {
+        "Battery level unavailable": "Akkustand nicht verfügbar"
+    },
+    "How often Razer, headset and BlueFerry levels are read (UPower devices update live)": {
+        "How often Razer, headset and BlueFerry levels are read (UPower devices update live)": "Wie oft Razer-, Headset- und BlueFerry-Akkus gelesen werden (UPower-Geräte aktualisieren sich sofort)"
     }
 }

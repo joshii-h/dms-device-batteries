@@ -29,7 +29,7 @@ PluginSettings {
     SelectionSetting {
         settingKey: "pollSeconds"
         label: I18n.trFor("deviceBatteries", "Refresh interval")
-        description: I18n.trFor("deviceBatteries", "How often Razer and headset levels are read (UPower devices update live)")
+        description: I18n.trFor("deviceBatteries", "How often Razer, headset and BlueFerry levels are read (UPower devices update live)")
         options: [
             { label: I18n.trFor("deviceBatteries", "30 seconds"), value: "30" },
             { label: I18n.trFor("deviceBatteries", "1 minute"), value: "60" },

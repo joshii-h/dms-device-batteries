@@ -8,7 +8,7 @@ import qs.Modules.Plugins
 
 // Runs exactly once (DMS daemon surface): collects all devices, sends the
 // low-battery warnings and shares the sorted list with every bar widget via
-// the plugin global variable "devices".
+// the plugin global variable "devices" (setup problems via "problems").
 PluginComponent {
     id: root
 
@@ -18,7 +18,9 @@ PluginComponent {
     readonly property string helper: pluginService ? pluginService.getPluginPath(pluginId) + "/device-batteries.py" : ""
 
     property var extraDevices: []
+    property var problems: []
     property var warned: ({})
+    property var problemsShown: ({})
     property bool helperWanted: true
 
     // external devices from UPower only – the laptop battery has its own DMS widget
@@ -58,7 +60,7 @@ PluginComponent {
         for (const d of devices) {
             if (d.charging || d.percent > warnLevel + 5) {
                 delete w[d.key];
-            } else if (d.percent <= warnLevel && !w[d.key]) {
+            } else if (d.percent <= warnLevel && !w[d.key] && d.warn !== false) {
                 w[d.key] = true;
                 if (notify)
                     Quickshell.execDetached(["dms", "notify", "-a", I18n.trFor("deviceBatteries", "Device Batteries"),
@@ -70,6 +72,31 @@ PluginComponent {
         warned = w;
     }
 
+    function problemText(id) {
+        switch (id) {
+        case "razer-driver":
+            return I18n.trFor("deviceBatteries", "A Razer device is plugged in, but the OpenRazer kernel driver is not loaded – rebuild or load the openrazer driver for the running kernel.");
+        case "razer-daemon":
+            return I18n.trFor("deviceBatteries", "The OpenRazer driver is loaded, but openrazer-daemon does not answer – start it.");
+        default:
+            return id;
+        }
+    }
+
+    // one notification per problem until it is gone again
+    onProblemsChanged: {
+        const list = problems.map(p => ({ key: p.key, id: p.id, text: problemText(p.id) }));
+        PluginService.setGlobalVar("deviceBatteries", "problems", list);
+        const shown = {};
+        for (const p of list) {
+            if (!problemsShown[p.key] && notify)
+                Quickshell.execDetached(["dms", "notify", "-a", I18n.trFor("deviceBatteries", "Device Batteries"),
+                    "-i", "dialog-warning", I18n.trFor("deviceBatteries", "Battery level unavailable"), p.text]);
+            shown[p.key] = true;
+        }
+        problemsShown = shown;
+    }
+
     // helper keeps running: one JSON line per change, re-read at once on udev
     // events (device plugged in, mouse docked) and every pollSeconds otherwise
     Process {
@@ -78,8 +105,12 @@ PluginComponent {
         command: ["python3", root.helper, "--watch", String(root.pollSeconds)]
         stdout: SplitParser {
             onRead: line => {
-                try { root.extraDevices = JSON.parse(line || "[]"); }
-                catch (e) { /* ignore partial lines */ }
+                try {
+                    const data = JSON.parse(line || "[]");
+                    // older helpers printed a plain device list
+                    root.extraDevices = Array.isArray(data) ? data : (data.devices || []);
+                    root.problems = Array.isArray(data) ? [] : (data.problems || []);
+                } catch (e) { /* ignore partial lines */ }
             }
         }
         onExited: {
@@ -105,5 +136,8 @@ PluginComponent {
         }
     }
 
-    Component.onCompleted: PluginService.setGlobalVar("deviceBatteries", "devices", devices)
+    Component.onCompleted: {
+        PluginService.setGlobalVar("deviceBatteries", "devices", devices);
+        PluginService.setGlobalVar("deviceBatteries", "problems", []);
+    }
 }
