@@ -7,6 +7,8 @@ battery are read directly from UPower by the plugin; this helper adds:
   - Razer devices via OpenRazer (openrazer-daemon must be running)
   - USB headsets via HeadsetControl (e.g. Logitech/Astro, SteelSeries, HyperX)
   - the iPhone via BlueFerry (BlueZ does not export its battery to UPower)
+  - AirPods/Beats (left, right, case) via the BlueFerry plugin
+    blueferry-plugin-airpods, read passively from their Bluetooth adverts
 
 All sources are optional; missing tools are skipped silently.
 Output: {"devices": [{"key", "name", "icon", "percent", "charging", "source",
@@ -33,6 +35,12 @@ import time
 
 
 BLUEFERRY = ("io.weirdware.BlueFerry", "/io/weirdware/BlueFerry", "io.weirdware.BlueFerry.Messages1")
+# blueferry-plugin-airpods: its own bus name (D-Bus activated), see its README
+ACCESSORIES = ("io.weirdware.BlueFerry.Plugin.io.weirdware.blueferry.airpods",
+               "/io/weirdware/BlueFerry/Plugin", "io.github.joshii_h.BlueFerryAccessories1")
+# AirPods only advertise while out of the case or with the lid open; older
+# readings are left out instead of showing a level that may be long gone
+ACCESSORY_MAX_AGE = 600
 
 
 def razer_hid_drivers():
@@ -85,6 +93,52 @@ def blueferry_phone():
         # BlueFerry sends its own low-battery warning; do not warn twice
         "warn": not status.get("phone_battery_warning", False),
     }]
+
+
+def blueferry_accessories():
+    """AirPods and Beats from the BlueFerry plugin blueferry-plugin-airpods
+    (https://github.com/joshii-h/blueferry-plugin-airpods): one entry per pod
+    and one for the case (headphones like the AirPods Max: one entry). The
+    plugin only reports the user's own devices; levels come in 10 % steps."""
+    try:
+        import dbus
+        bus = dbus.SessionBus()
+        data = json.loads(str(dbus.Interface(bus.get_object(*ACCESSORIES[:2]), ACCESSORIES[2])
+                              .GetBatteries(timeout=5)))
+    except Exception:
+        return []   # plugin not installed, disabled or not answering
+    if not isinstance(data, dict) or data.get("version") != 1:
+        return []
+    out = []
+    for dev in data.get("devices") or []:
+        if not isinstance(dev, dict):
+            continue
+        age = dev.get("age_seconds")
+        if not isinstance(age, int) or age > ACCESSORY_MAX_AGE:
+            continue
+        name = str(dev.get("name") or "AirPods")
+        ident = str(dev.get("id") or name)
+        if dev.get("kind") == "headphones":
+            parts = [("battery", name, "headphones")]
+        else:
+            parts = [("left", name + " (L)", "earbuds"), ("right", name + " (R)", "earbuds"),
+                     ("case", name + " (Case)", "earbuds_battery")]
+        for field, label, icon in parts:
+            b = dev.get(field)
+            if not isinstance(b, dict):
+                continue
+            level = b.get("percent")
+            if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 100:
+                continue
+            out.append({
+                "name": label,
+                "icon": icon,
+                "percent": level,
+                "charging": bool(b.get("charging")),
+                "source": "blueferry-airpods",
+                "key": f"blueferry-airpods:{ident}:{field}",
+            })
+    return out
 
 
 def collect():
@@ -154,6 +208,9 @@ def collect():
 
     # iPhone via BlueFerry
     out.extend(blueferry_phone())
+
+    # AirPods/Beats via the BlueFerry plugin blueferry-plugin-airpods
+    out.extend(blueferry_accessories())
 
     # unique keys for sources without a serial (two identical headsets must
     # not share a warning); Razer devices already have their serial as key
