@@ -23,11 +23,14 @@ Unknown levels (-1) and sleeping Razer mice (0 % and not charging) are left out.
   device-batteries.py               # print once
   device-batteries.py --watch 60    # keep running: one JSON line per change,
                                     # re-read at once on udev events (device
-                                    # plugged in, mouse docked) and every 60 s
+                                    # plugged in, mouse docked), when the
+                                    # AirPods plugin signals Changed, and
+                                    # every 60 s
 """
 import glob
 import json
 import os
+import select
 import shutil
 import subprocess
 import sys
@@ -36,7 +39,8 @@ import time
 
 BLUEFERRY = ("io.weirdware.BlueFerry", "/io/weirdware/BlueFerry", "io.weirdware.BlueFerry.Messages1")
 # blueferry-plugin-airpods: its own bus name (D-Bus activated), see its README
-ACCESSORIES = ("io.weirdware.BlueFerry.Plugin.io.weirdware.blueferry.airpods",
+ACCESSORIES_PLUGIN = "io.weirdware.blueferry.airpods"
+ACCESSORIES = ("io.weirdware.BlueFerry.Plugin." + ACCESSORIES_PLUGIN,
                "/io/weirdware/BlueFerry/Plugin", "io.github.joshii_h.BlueFerryAccessories1")
 # AirPods only advertise while out of the case or with the lid open; older
 # readings are left out instead of showing a level that may be long gone
@@ -95,14 +99,34 @@ def blueferry_phone():
     }]
 
 
-def blueferry_accessories():
+def blueferry_plugin_disabled(plugin_id):
+    """Whether the user disabled a plugin in BlueFerry (its plugins.json)."""
+    home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    try:
+        with open(os.path.join(home, "blueferry", "plugins.json"), encoding="utf-8") as f:
+            value = json.loads(f.read(1024 * 1024))
+    except (OSError, ValueError):
+        return False
+    disabled = value.get("disabled") if isinstance(value, dict) else None
+    return isinstance(disabled, list) and plugin_id in disabled
+
+
+def blueferry_accessories(activate=False):
     """AirPods and Beats from the BlueFerry plugin blueferry-plugin-airpods
     (https://github.com/joshii-h/blueferry-plugin-airpods): one entry per pod
     and one for the case (headphones like the AirPods Max: one entry). The
-    plugin only reports the user's own devices; levels come in 10 % steps."""
+    plugin only reports the user's own devices; levels come in 10 % steps.
+
+    The plugin is D-Bus activated. It is only started when ``activate`` is
+    set (once per helper run) and never while it is disabled in BlueFerry;
+    otherwise it is asked only while it runs anyway."""
+    if blueferry_plugin_disabled(ACCESSORIES_PLUGIN):
+        return []
     try:
         import dbus
         bus = dbus.SessionBus()
+        if not activate and not bus.name_has_owner(ACCESSORIES[0]):
+            return []
         data = json.loads(str(dbus.Interface(bus.get_object(*ACCESSORIES[:2]), ACCESSORIES[2])
                               .GetBatteries(timeout=5)))
     except Exception:
@@ -141,7 +165,7 @@ def blueferry_accessories():
     return out
 
 
-def collect():
+def collect(activate=False):
     out, problems = [], []
 
     # Razer via OpenRazer
@@ -210,7 +234,7 @@ def collect():
     out.extend(blueferry_phone())
 
     # AirPods/Beats via the BlueFerry plugin blueferry-plugin-airpods
-    out.extend(blueferry_accessories())
+    out.extend(blueferry_accessories(activate))
 
     # unique keys for sources without a serial (two identical headsets must
     # not share a warning); Razer devices already have their serial as key
@@ -224,8 +248,44 @@ def collect():
     return {"devices": out, "problems": problems}
 
 
+def accessory_events():
+    """A pipe that becomes readable when the AirPods plugin signals Changed
+    or comes and goes on the bus; None without dbus-python and PyGObject.
+    Listening never starts the plugin."""
+    try:
+        import threading
+        import dbus
+        from dbus.mainloop.glib import DBusGMainLoop
+        from gi.repository import GLib
+        bus = dbus.SessionBus(mainloop=DBusGMainLoop(), private=True)
+        r, w = os.pipe()
+        os.set_blocking(w, False)
+
+        def wake(*_args):
+            try:
+                os.write(w, b"x")
+            except BlockingIOError:
+                pass   # a wake-up is pending already
+
+        bus.add_signal_receiver(wake, "Changed", ACCESSORIES[2], ACCESSORIES[0], ACCESSORIES[1])
+        bus.add_signal_receiver(wake, "NameOwnerChanged", "org.freedesktop.DBus",
+                                "org.freedesktop.DBus", "/org/freedesktop/DBus",
+                                arg0=ACCESSORIES[0])
+        def run():
+            # holds the private connection: it would be collected otherwise
+            listener = bus
+            GLib.MainLoop().run()
+            listener.close()
+
+        threading.Thread(target=run, daemon=True).start()
+        return r
+    except Exception:
+        return None   # plain polling
+
+
 def watch(interval):
-    """Print a JSON line whenever the result changes; wake early on udev events."""
+    """Print a JSON line whenever the result changes; wake early on udev
+    events and on the AirPods plugin's Changed signal."""
     try:
         import pyudev
         mon = pyudev.Monitor.from_netlink(pyudev.Context())
@@ -234,13 +294,16 @@ def watch(interval):
         mon.start()
     except Exception:
         mon = None   # no pyudev: plain polling
+    events = accessory_events()
     last = None
     parent = os.getppid()
+    activate = True   # start the AirPods plugin once, then only follow it
     while True:
         # the shell went away (restart/crash): stop instead of lingering on
         if os.getppid() != parent:
             return
-        cur = json.dumps(collect(), ensure_ascii=False)
+        cur = json.dumps(collect(activate), ensure_ascii=False)
+        activate = False
         if cur != last:
             print(cur, flush=True)
             last = cur
@@ -249,15 +312,22 @@ def watch(interval):
             if os.getppid() != parent:
                 return
             left = min(left, 10)
-            if mon is None:
+            sources = [s for s in (mon, events) if s is not None]
+            if not sources:
                 time.sleep(left)
                 continue
-            if mon.poll(timeout=left) is not None:
+            ready = select.select(sources, [], [], left)[0]
+            if not ready:
+                continue
+            if mon is not None and mon in ready:
                 # let the device settle, then swallow the rest of the burst
                 time.sleep(1.5)
                 while mon.poll(timeout=0) is not None:
                     pass
-                break
+            if events is not None and events in ready:
+                time.sleep(0.3)   # pods and case change in quick succession
+                os.read(events, 4096)
+            break
 
 
 if "--watch" in sys.argv:
@@ -271,4 +341,4 @@ if "--watch" in sys.argv:
     except (KeyboardInterrupt, BrokenPipeError):
         pass
 else:
-    print(json.dumps(collect(), ensure_ascii=False))
+    print(json.dumps(collect(activate=True), ensure_ascii=False))
