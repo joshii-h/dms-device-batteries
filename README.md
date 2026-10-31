@@ -47,7 +47,11 @@ low-battery warning for the iPhone; while it is on, this plugin does not warn a
 second time. AirPods levels come in 10 % steps; they are left out once the
 AirPods have been silent for 10 minutes (closed case, out of range). AirPods
 connected to this computer may also appear once through UPower (one combined
-level). The helper needs `dbus-python` for BlueFerry and the AirPods plugin and
+level). The AirPods plugin is started (D-Bus activation) only once when the
+helper starts and never while it is disabled in BlueFerry; after that the
+helper asks it only while it runs, and re-reads at once when the plugin
+signals `Changed` (needs PyGObject; without it, at the refresh interval).
+The helper needs `dbus-python` for BlueFerry and the AirPods plugin and
 `pyudev` for instant updates.
 
 ## Installation
