@@ -2,7 +2,7 @@
     "$schema": "https://github.com/AvengeMedia/DankMaterialShell/raw/refs/heads/master/PLUGINS/plugin-schema.json",
     "id": "deviceBatteries",
     "name": "Device Batteries",
-    "description": "Battery levels of your iPhone (BlueFerry), Bluetooth devices, Razer mice and USB headsets in one bar widget, with a low-battery warning",
+    "description": "Battery levels of your iPhone and AirPods (BlueFerry), Bluetooth devices, Razer mice and USB headsets in one bar widget, with a low-battery warning",
     "version": "1.4.0",
     "author": "joshii-h",
     "icon": "battery_full",
