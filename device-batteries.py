@@ -147,7 +147,7 @@ def blueferry_accessories(activate=False):
         else:
             parts = [("left", name + " (L)", "earbuds"), ("right", name + " (R)", "earbuds"),
                      ("case", name + " (Case)", "earbuds_battery")]
-        for field, label, icon in parts:
+        for order, (field, label, icon) in enumerate(parts):
             b = dev.get(field)
             if not isinstance(b, dict):
                 continue
@@ -161,6 +161,10 @@ def blueferry_accessories(activate=False):
                 "charging": bool(b.get("charging")),
                 "source": "blueferry-airpods",
                 "key": f"blueferry-airpods:{ident}:{field}",
+                # pods and case stay together in the list, in this order;
+                # a closed case is simply missing from the group
+                "group": f"blueferry-airpods:{ident}",
+                "order": order,
             })
     return out
 

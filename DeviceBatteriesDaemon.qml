@@ -36,8 +36,29 @@ PluginComponent {
             source: "upower"
         }))
 
-    readonly property var devices: upowerDevices.concat(extraDevices)
-        .sort((a, b) => a.percent - b.percent)
+    readonly property var devices: sortDevices(upowerDevices.concat(extraDevices))
+
+    // Lowest battery first. Parts of one set (AirPods L, R, case) stay
+    // together and are placed by their lowest part. Ties are broken by name,
+    // so the order does not jump around between refreshes.
+    function sortDevices(list) {
+        const groupMin = {}, groupName = {};
+        for (const d of list) {
+            const g = d.group || d.key;
+            groupMin[g] = Math.min(groupMin[g] ?? 101, d.percent);
+            if (groupName[g] === undefined || String(d.name) < groupName[g])
+                groupName[g] = String(d.name);
+        }
+        return list.slice().sort((a, b) => {
+            const ga = a.group || a.key, gb = b.group || b.key;
+            if (ga !== gb) {
+                return (groupMin[ga] - groupMin[gb])
+                    || groupName[ga].localeCompare(groupName[gb])
+                    || ga.localeCompare(gb);
+            }
+            return (a.order ?? 0) - (b.order ?? 0);
+        });
+    }
 
     function iconFor(t) {
         switch (t) {
