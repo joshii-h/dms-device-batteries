@@ -12,7 +12,8 @@ PluginComponent {
     readonly property int warnLevel: parseInt(pluginData.warnLevel) || 20
     property var devices: PluginService.getGlobalVar("deviceBatteries", "devices", [])
     property var problems: PluginService.getGlobalVar("deviceBatteries", "problems", [])
-    readonly property var lowest: devices.length > 0 ? devices[0] : null
+    // the list keeps sets (AirPods L, R, case) together, so its first entry is not always the lowest
+    readonly property var lowest: devices.reduce((low, d) => low === null || d.percent < low.percent ? d : low, null)
 
     Connections {
         target: PluginService
