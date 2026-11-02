@@ -83,8 +83,12 @@ PluginComponent {
         }
     }
 
-    popoutWidth: 340
-    popoutHeight: 90 + Math.max(1, devices.length) * 44 + problems.length * 64
+    readonly property real rowHeight: Theme.iconSize + Theme.spacingM
+
+    popoutWidth: Theme.listItemHeight * 6
+    popoutHeight: Theme.listItemHeight + Theme.spacingL * 2
+                  + Math.max(1, devices.length) * (rowHeight + Theme.spacingS)
+                  + problems.length * (Theme.listItemHeight + Theme.spacingS)
 
     popoutContent: Component {
         PopoutComponent {
@@ -106,11 +110,11 @@ PluginComponent {
 
                         DIcon {
                             name: "warning"
-                            size: 22
+                            size: Theme.iconSize
                             color: Theme.warning
                         }
                         StyledText {
-                            width: parent.width - 22 - Theme.spacingM
+                            width: parent.width - Theme.iconSize - Theme.spacingM
                             text: modelData.text
                             wrapMode: Text.WordWrap
                             maximumLineCount: 3
@@ -126,17 +130,17 @@ PluginComponent {
                     delegate: Row {
                         required property var modelData
                         width: parent.width
-                        height: 36
+                        height: root.rowHeight
                         spacing: Theme.spacingM
 
                         DIcon {
                             name: modelData.icon
-                            size: 22
+                            size: Theme.iconSize
                             color: Theme.surfaceText
                             anchors.verticalCenter: parent.verticalCenter
                         }
                         StyledText {
-                            width: parent.width - 22 - 110 - Theme.spacingM * 2
+                            width: parent.width - Theme.iconSize - levelRow.implicitWidth - Theme.spacingM * 2
                             text: modelData.name
                             elide: Text.ElideRight
                             wrapMode: Text.NoWrap
@@ -146,7 +150,7 @@ PluginComponent {
                             anchors.verticalCenter: parent.verticalCenter
                         }
                         Row {
-                            width: 110
+                            id: levelRow
                             spacing: Theme.spacingXS
                             layoutDirection: Qt.RightToLeft
                             anchors.verticalCenter: parent.verticalCenter
@@ -157,7 +161,7 @@ PluginComponent {
                             }
                             DIcon {
                                 name: root.batteryIcon(modelData)
-                                size: 20
+                                size: Theme.iconSizeMedium
                                 color: root.levelColor(modelData)
                             }
                         }

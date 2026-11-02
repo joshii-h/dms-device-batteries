@@ -3,7 +3,7 @@
     "id": "deviceBatteries",
     "name": "Device Batteries",
     "description": "Battery levels of your iPhone (BlueFerry), Bluetooth devices, Razer mice and USB headsets in one bar widget, with a low-battery warning",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "author": "joshii-h",
     "icon": "battery_full",
     "type": "composite",
