@@ -6,6 +6,9 @@ battery are read directly from UPower by the plugin; this helper adds:
 
   - Razer devices via OpenRazer (openrazer-daemon must be running)
   - USB headsets via HeadsetControl (e.g. Logitech/Astro, SteelSeries, HyperX)
+  - Logitech mice and keyboards on a Unifying/Bolt receiver or over
+    Bluetooth via Solaar's library (logitech_receiver), when the kernel does
+    not hand their battery to UPower (e.g. on a Bolt receiver)
   - the iPhone via BlueFerry (BlueZ does not export its battery to UPower)
   - AirPods/Beats (left, right, case) via the BlueFerry plugin
     blueferry-plugin-airpods, read passively from their Bluetooth adverts
@@ -169,6 +172,77 @@ def blueferry_accessories(activate=False):
     return out
 
 
+SOLAAR_ICONS = {"mouse": "mouse", "trackball": "mouse", "touchpad": "mouse",
+                "keyboard": "keyboard", "numpad": "keyboard", "headset": "headphones"}
+
+
+def kernel_hidpp_serials():
+    """Serial numbers of Logitech devices whose battery the kernel driver
+    (hid-logitech-hidpp) already exports; UPower shows those itself."""
+    serials = set()
+    for path in glob.glob("/sys/class/power_supply/hidpp_battery_*/serial_number"):
+        try:
+            with open(path, encoding="utf-8") as f:
+                serials.add(f.read().strip().upper())
+        except OSError:
+            pass
+    return serials
+
+
+def solaar_devices():
+    """Logitech HID++ devices via Solaar's library (https://github.com/pwr-Solaar/Solaar).
+    Bolt receivers in particular get no battery from the kernel driver, so
+    UPower never sees these devices. Asks only for the battery of devices that
+    are online; works next to a running Solaar window. Needs read access to
+    the receiver's hidraw node, which Solaar's udev rule grants."""
+    try:
+        import logging
+        logging.disable(logging.CRITICAL)   # the library logs to stderr freely
+        from logitech_receiver import base, device, receiver
+    except Exception:
+        return []   # Solaar not installed
+    known = kernel_hidpp_serials()
+    out = []
+    try:
+        infos = list(base.receivers_and_devices())
+    except Exception:
+        return []
+    for info in infos:
+        try:
+            if info.isDevice:
+                dev = device.create_device(base, info)
+                devices = [dev] if dev else []
+            else:
+                rcv = receiver.create_receiver(base, info)
+                devices = list(rcv) if rcv else []
+        except Exception:
+            continue   # no access to the hidraw node, or the receiver went away
+        for d in devices:
+            try:
+                if not d.online:
+                    continue   # asleep or switched off
+                serial = str(d.unitId or d.serial or "")
+                if serial and serial.upper() in known:
+                    continue   # UPower shows it already
+                b = d.battery()
+                if b is None or b.level is None:
+                    continue
+                level = int(b.level)   # exact, or a NamedInt approximation (5/20/50/90/100)
+                if not 0 <= level <= 100:
+                    continue
+                out.append({
+                    "name": str(d.name or d.codename or "Logitech device"),
+                    "icon": SOLAAR_ICONS.get(str(d.kind or "").lower(), "devices"),
+                    "percent": level,
+                    "charging": bool(b.charging()),
+                    "source": "solaar",
+                    "key": "solaar:" + (serial or str(d.name)),
+                })
+            except Exception:
+                pass   # went to sleep while being asked
+    return out
+
+
 def collect(activate=False):
     out, problems = [], []
 
@@ -233,6 +307,9 @@ def collect(activate=False):
                 "charging": status == "BATTERY_CHARGING",
                 "source": "headsetcontrol",
             })
+
+    # Logitech (Unifying/Bolt/Bluetooth) via Solaar's library
+    out.extend(solaar_devices())
 
     # iPhone via BlueFerry
     out.extend(blueferry_phone())

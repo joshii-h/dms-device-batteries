@@ -5,7 +5,8 @@ that shows the battery levels of all your wireless peripherals in one place.
 
 DMS's own battery popout already lists Bluetooth peripherals that UPower knows.
 This plugin adds what UPower cannot see – Razer devices (OpenRazer), USB
-wireless headsets (HeadsetControl), the iPhone via BlueFerry and AirPods (left, right, case) via the
+wireless headsets (HeadsetControl), Logitech devices on a Bolt or Unifying
+receiver (Solaar), the iPhone via BlueFerry and AirPods (left, right, case) via the
 BlueFerry AirPods plugin – plus a bar pill for the lowest battery and
 a low-battery warning. Other registry plugins cover a single device (one mouse
 model, controllers, ZMK keyboards, a phone). It is meant for external hardware
@@ -33,10 +34,11 @@ only; the laptop battery has its own DMS widget.
 | UPower | phones (iPhone/Android over Bluetooth), Bluetooth mice, keyboards, headphones, controllers | `upower` (already used by DMS) |
 | [OpenRazer](https://openrazer.github.io/) | Razer wireless mice, keyboards, headsets | `openrazer-daemon` running |
 | [HeadsetControl](https://github.com/Sapd/HeadsetControl) | USB wireless headsets (Logitech/Astro, SteelSeries, HyperX, Corsair, …) | `headsetcontrol` ≥ 4.2 for the Astro A50 Gen 5 |
+| [Solaar](https://github.com/pwr-Solaar/Solaar) | Logitech mice and keyboards on a Unifying or Bolt receiver (or over Bluetooth) whose battery the kernel does not hand to UPower, e.g. an MX Master 3S on a Bolt receiver | `solaar` installed (its library and udev rule); the Solaar window does not need to run |
 | [BlueFerry](https://github.com/erikwb/blueferry) | iPhone over Bluetooth (BlueZ does not hand its battery to UPower) | `blueferry` daemon running |
 | [blueferry-plugin-airpods](https://github.com/joshii-h/blueferry-plugin-airpods) | AirPods and Beats: left, right and case (AirPods Max: one level), from their Bluetooth adverts, also when they are paired with the iPhone only | the BlueFerry plugin installed and enabled |
 
-UPower devices update live. OpenRazer, HeadsetControl, BlueFerry and the AirPods plugin are read by the
+UPower devices update live. OpenRazer, HeadsetControl, Solaar, BlueFerry and the AirPods plugin are read by the
 bundled helper `device-batteries.py`, which keeps running and re-reads at once
 when a device is plugged in or docked (udev, needs `pyudev`), otherwise at the
 configured interval. A plugin daemon runs the helper and the warnings exactly
@@ -51,6 +53,9 @@ level). The AirPods plugin is started (D-Bus activation) only once when the
 helper starts and never while it is disabled in BlueFerry; after that the
 helper asks it only while it runs, and re-reads at once when the plugin
 signals `Changed` (needs PyGObject; without it, at the refresh interval).
+Logitech devices that the kernel already reports
+to UPower (its `hidpp_battery` entry) are not listed a second time; devices
+that are asleep or switched off are left out until they answer again.
 The helper needs `dbus-python` for BlueFerry and the AirPods plugin and
 `pyudev` for instant updates.
 
