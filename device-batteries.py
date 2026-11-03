@@ -178,23 +178,44 @@ SOLAAR_ICONS = {"mouse": "mouse", "trackball": "mouse", "touchpad": "mouse",
 
 def kernel_hidpp_serials():
     """Serial numbers of Logitech devices whose battery the kernel driver
-    (hid-logitech-hidpp) already exports; UPower shows those itself."""
+    (hid-logitech-hidpp) already exports; UPower shows those itself. The
+    kernel writes them as "7b-85-07-7b", Solaar as "7B85077B"."""
     serials = set()
     for path in glob.glob("/sys/class/power_supply/hidpp_battery_*/serial_number"):
         try:
             with open(path, encoding="utf-8") as f:
-                serials.add(f.read().strip().upper())
+                serials.add(f.read().strip().replace("-", "").upper())
         except OSError:
             pass
     return serials
 
 
+class _SolaarLowLevel:
+    """Solaar's hidapi layer, except that devices behind a receiver are not
+    looked up as hidraw nodes of their own: that lookup spins for a second
+    per device on a Bolt receiver, and the receiver's handle is enough."""
+
+    def __init__(self, base):
+        self._base = base
+
+    def __getattr__(self, name):
+        return getattr(self._base, name)
+
+    def find_paired_node(self, *_args):
+        return None
+
+
 def solaar_devices():
     """Logitech HID++ devices via Solaar's library (https://github.com/pwr-Solaar/Solaar).
     Bolt receivers in particular get no battery from the kernel driver, so
-    UPower never sees these devices. Asks only for the battery of devices that
-    are online; works next to a running Solaar window. Needs read access to
-    the receiver's hidraw node, which Solaar's udev rule grants."""
+    UPower never sees these devices. Asks only for the battery; works next to
+    a running Solaar window. Needs read access to the receiver's hidraw node,
+    which Solaar's udev rule grants.
+
+    Every handle is closed again (the library keeps devices in a class-wide
+    list, so nothing would be collected), and Solaar's config.yaml is never
+    touched: each device gets a throwaway in-memory settings store instead of
+    the one that writes the file the Solaar window uses."""
     try:
         import logging
         logging.disable(logging.CRITICAL)   # the library logs to stderr freely
@@ -202,45 +223,72 @@ def solaar_devices():
     except Exception:
         return []   # Solaar not installed
     known = kernel_hidpp_serials()
+    low_level = _SolaarLowLevel(base)
     out = []
     try:
         infos = list(base.receivers_and_devices())
     except Exception:
         return []
     for info in infos:
+        owner, devices = None, []
         try:
             if info.isDevice:
-                dev = device.create_device(base, info)
-                devices = [dev] if dev else []
+                owner = device.create_device(low_level, info)
+                devices = [owner] if owner else []
             else:
-                rcv = receiver.create_receiver(base, info)
-                devices = list(rcv) if rcv else []
+                owner = receiver.create_receiver(low_level, info)
+                devices = list(owner) if owner else []
+            for d in devices:
+                d._persister = {"device-batteries": True}   # not empty: no config.yaml
+                entry = _solaar_entry(d, known)
+                if entry:
+                    out.append(entry)
         except Exception:
-            continue   # no access to the hidraw node, or the receiver went away
-        for d in devices:
+            pass   # no access to the hidraw node, or the receiver went away
+        finally:
+            for d in devices:
+                try:
+                    d.close()
+                except Exception:
+                    pass
             try:
-                if not d.online:
-                    continue   # asleep or switched off
-                serial = str(d.unitId or d.serial or "")
-                if serial and serial.upper() in known:
-                    continue   # UPower shows it already
-                b = d.battery()
-                if b is None or b.level is None:
-                    continue
-                level = int(b.level)   # exact, or a NamedInt approximation (5/20/50/90/100)
-                if not 0 <= level <= 100:
-                    continue
-                out.append({
-                    "name": str(d.name or d.codename or "Logitech device"),
-                    "icon": SOLAAR_ICONS.get(str(d.kind or "").lower(), "devices"),
-                    "percent": level,
-                    "charging": bool(b.charging()),
-                    "source": "solaar",
-                    "key": "solaar:" + (serial or str(d.name)),
-                })
+                if owner is not None:
+                    owner.close()   # the receiver's own handle
             except Exception:
-                pass   # went to sleep while being asked
+                pass
+            # Device.close() looks itself up by equality, which can hit an
+            # older equal device; drop exactly these objects from the
+            # class-wide list so a long-running helper does not grow.
+            gone = {id(d) for d in devices} | {id(owner)}
+            device.Device.instances[:] = [
+                x for x in device.Device.instances if id(x) not in gone
+            ]
     return out
+
+
+def _solaar_entry(d, known):
+    try:
+        if not d.online:
+            return None   # asleep or switched off
+        serial = str(d.unitId or d.serial or "")
+        if serial and serial.upper() in known:
+            return None   # UPower shows it already
+        b = d.battery()
+        if b is None or b.level is None:
+            return None
+        level = int(b.level)   # exact, or an approximation (5/20/50/90/100)
+        if not 0 <= level <= 100:
+            return None
+        return {
+            "name": str(d.name or d.codename or "Logitech device"),
+            "icon": SOLAAR_ICONS.get(str(d.kind or "").lower(), "devices"),
+            "percent": level,
+            "charging": bool(b.charging()),
+            "source": "solaar",
+            "key": "solaar:" + (serial or str(d.name)),
+        }
+    except Exception:
+        return None   # went to sleep while being asked
 
 
 def collect(activate=False):
